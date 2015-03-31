@@ -1598,7 +1598,7 @@ def fetch_msdl_atlas(data_dir=None, url=None, resume=True, verbose=1):
 
 
 def fetch_harvard_oxford(atlas_name, data_dir=None, symmetric_split=False,
-                        resume=True, verbose=1):
+                         resume=True, verbose=1):
     """Load Harvard-Oxford parcellation from FSL if installed or download it.
 
     This function looks up for Harvard Oxford atlas in the system and load it
@@ -1606,8 +1606,8 @@ def fetch_harvard_oxford(atlas_name, data_dir=None, symmetric_split=False,
     directory.
 
     Parameters
-    ==========
-    atlas_name: string
+    ----------
+    atlas_name : string
         Name of atlas to load. Can be:
         cort-maxprob-thr0-1mm,  cort-maxprob-thr0-2mm,
         cort-maxprob-thr25-1mm, cort-maxprob-thr25-2mm,
@@ -1618,19 +1618,30 @@ def fetch_harvard_oxford(atlas_name, data_dir=None, symmetric_split=False,
         cort-prob-1mm, cort-prob-2mm,
         sub-prob-1mm, sub-prob-2mm
 
-    data_dir: string, optional
+    data_dir : string, optional
         Path of data directory. It can be FSL installation directory
         (which is dependent on your installation).
 
-    symmetric_split: bool, optional
+    symmetric_split : bool, optional
         If True, split every symmetric region in left and right parts.
         Effectively doubles the number of regions. Default: False.
         Not implemented for probabilistic atlas (*-prob-* atlases)
 
     Returns
-    =======
-    regions: nibabel.Nifti1Image
-        regions definition, as a label image.
+    -------
+    regions : nibabel.Nifti1Image
+        Label image.
+    labels : list of string
+        Array with label names.
+
+    Examples
+    --------
+    >>> regions, labels = fetch_harvard_oxford('sub-maxprob-thr25-2mm')
+    >>> 'Right Caudate' in labels
+    True
+    >>> regions.get_data()[9, 44, 34]
+    42
+
     """
     atlas_items = ("cort-maxprob-thr0-1mm", "cort-maxprob-thr0-2mm",
                    "cort-maxprob-thr25-1mm", "cort-maxprob-thr25-2mm",
@@ -1672,7 +1683,9 @@ def fetch_harvard_oxford(atlas_name, data_dir=None, symmetric_split=False,
     names = np.asarray(list(names.values()))
 
     if not symmetric_split:
-        return atlas_img, names
+        atlas_img = check_niimg(atlas_img)
+        atlas = atlas_img.get_data()
+        return new_img_like(atlas_img, atlas, atlas_img.get_affine()), names.tolist()
 
     if atlas_name in ("cort-prob-1mm", "cort-prob-2mm",
                       "sub-prob-1mm", "sub-prob-2mm"):
@@ -1685,8 +1698,9 @@ def fetch_harvard_oxford(atlas_name, data_dir=None, symmetric_split=False,
     labels = np.unique(atlas)
     slices = ndimage.find_objects(atlas)
     middle_ind = (atlas.shape[0] - 1) // 2
-    crosses_middle = [s.start < middle_ind and s.stop > middle_ind
-                      for s, _, _ in slices]
+    crosses_middle = [slice[0].start < middle_ind and \
+                          slice[0].stop > middle_ind
+                      for slice in slices if slice is not None]
 
     # Split every zone crossing the median plane into two parts.
     # Assumes that the background label is zero.
